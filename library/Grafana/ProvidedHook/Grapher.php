@@ -134,11 +134,16 @@ class Grapher extends GrapherHook
         }
     }
 
-    private function getGraphConf($serviceName, $serviceCommand)
+    private function getGraphConf($serviceName, $serviceCommand,$hostgroups)
     {
-
         $graphconfig = Config::module('grafana', 'graphs');
         $this->graphConfig = $graphconfig;
+
+        foreach($hostgroups as $key => $value) {
+            if ($this->graphconfig->hasSection('hostgroup='.$key.'&service='.$serviceName))  {
+                $serviceName='hostgroup='.$key.'&service='.$serviceName;
+            }
+        }
         if ($this->graphConfig->hasSection(strtok($serviceName, ' ')) && ($this->graphConfig->hasSection($serviceName) == False)) {
             $serviceName = strtok($serviceName, ' ');
         }
@@ -337,7 +342,7 @@ class Grapher extends GrapherHook
             $hostName = $object->host->getName();
         }
 
-        if($this->getGraphConf($serviceName, $object->check_command) == NULL) {
+        if($this->getGraphConf($serviceName, $object->check_command, $object->hostgroups) == NULL) {
             return;
         }
 
