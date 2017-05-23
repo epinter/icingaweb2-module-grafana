@@ -144,8 +144,18 @@ class Grapher extends GrapherHook
             if ($this->graphConfig->hasSection($hostgroup_section))  {
                 $serviceName=$hostgroup_section;
             }
+            $hostgroup_section='hostgroup='.$key.'&servicecommand='.$serviceCommand;
+            if ($this->graphConfig->hasSection($hostgroup_section))  {
+                $serviceName=$hostgroup_section;
+            }
         }
+
         $hostname_section='hostname='.$hostname.'&service='.$serviceName;
+        if ($this->graphConfig->hasSection($hostname_section))  {
+                $serviceName=$hostname_section;
+        }
+
+        $hostname_section='hostname='.$hostname.'&servicecommand='.$serviceCommand;
         if ($this->graphConfig->hasSection($hostname_section))  {
                 $serviceName=$hostname_section;
         }
