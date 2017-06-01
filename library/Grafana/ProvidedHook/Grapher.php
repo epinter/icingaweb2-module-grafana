@@ -33,6 +33,7 @@ class Grapher extends GrapherHook
     protected $height = 280;
     protected $enableLink = true;
     protected $defaultDashboard = "icinga2-default";
+    protected $hostDashboard = null;
     protected $shadows = false;
     protected $defaultDashboardStore = "db";
     protected $dataSource = null;
@@ -145,6 +146,7 @@ class Grapher extends GrapherHook
         $this->dashboard = $this->graphConfig->get($serviceName, 'dashboard', $this->defaultDashboard);
         $this->dashboardstore = $this->graphConfig->get($serviceName, 'dashboardstore', $this->defaultDashboardStore);
         $this->panelId = $this->graphConfig->get($serviceName, 'panelId', '1');
+        $this->hostDashboard = $this->graphConfig->get($serviceName, 'hostDashboard');
         $this->customVars = $this->graphConfig->get($serviceName, 'customVars', '');
         $this->timerange = Url::fromRequest()->hasParam('timerange') ? Url::fromRequest()->getParam('timerange') : $this->graphConfig->get($serviceName, 'timerange', $this->timerange);
         $this->height = $this->graphConfig->get($serviceName, 'height', $this->height);
@@ -360,9 +362,12 @@ class Grapher extends GrapherHook
             if (!$res || $this->enableLink == "no") {
                 $html .= $previewHtml;
             } else {
-                $html .= '<a href="%s://%s/dashboard/%s/%s?var-hostname=%s&var-service=%s%s&from=now-%s&to=now';
+                $html .= '<a href="%s://%s/dashboard/%s/%s?var-hostname=%s%s&from=now-%s&to=now%s';
 
-                if ($this->dashboard != $this->defaultDashboard) {
+                if(!$object instanceof Host && $this->hostDashboard) {
+                    $this->hostDashboard = null;
+                }
+                if ($this->dashboard != $this->defaultDashboard && !$this->hostDashboard) {
                     $html .= '&panelId=' . $this->panelId . '&fullscreen';
                 }
 
@@ -373,13 +378,14 @@ class Grapher extends GrapherHook
                     $this->publicProtocol,
                     $this->publicHost,
                     $this->dashboardstore,
-                    $this->dashboard,
+                    $this->hostDashboard?$this->hostDashboard:$this->dashboard,
                     urlencode($hostName),
-                    rawurlencode($serviceName),
                     $this->customVars,
                     $this->timerange,
+                    !$this->hostDashboard?sprintf("&var-service=%s",rawurlencode($serviceName)):'',
                     $previewHtml
                 );
+
             }
             $return_html .= $html;
         }

@@ -147,6 +147,7 @@ name               | **Optional.** The name (not the `display_name`) of the serv
 dashboard          | **Optional.** Name of the Grafana dashboard to use.
 panelId            | **Optional.** Graph panelId. Open Grafana and select to share your dashboard to extract the value.
 customVars         | **Optional.** Set additional custom variables used for Grafana.
+hostDashboard      | **Optional.** Dashboard for the link on host graph.
 timerange          | **Optional.** Specify the time range for this graph.
 height             | **Optional.** Graph height in pixel. Overrides global default.
 width              | **Optional.** Graph width in pixel. Overrides global default.
