@@ -178,6 +178,17 @@ class GraphForm extends ConfigForm
             )
         );
 
+        $this->addElement(
+            'textarea',
+            'hostDashboardOverrides',
+            array(
+                'placeholder'   => "'hostgroup-internalname'='1'\n'hostname'='2'",
+                'label'         => $this->translate('Host Dashboard Overrides'),
+                'description'   => $this->translate("Override rules, one by line, single-quotes are important. Example: 'hostgroup-internalname'='linuxdashboard'"),
+                'required'      => false
+            )
+        );
+
     }
 
     /**
@@ -223,6 +234,7 @@ class GraphForm extends ConfigForm
             'dashboardOverrides'     => $this->getElement('dashboardOverrides')->getValue(),
             'widthOverrides'     => $this->getElement('widthOverrides')->getValue(),
             'heightOverrides'     => $this->getElement('heightOverrides')->getValue(),
+            'hostDashboardOverrides'     => $this->getElement('hostDashboardOverrides')->getValue(),
         );
 	if (empty($values['timerange'])) {
             $values['timerange'] = null;
