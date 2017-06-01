@@ -56,6 +56,17 @@ class GraphForm extends ConfigForm
 
         $this->addElement(
             'text',
+            'hostDashboard',
+            array(
+                'placeholder'   => 'HostDashboardName',
+                'label'         => $this->translate('Host Dashboard name'),
+                'description'   => $this->translate('Name of the Grafana dashboard to link on host graph.'),
+                'required'      => false
+            )
+        );
+
+        $this->addElement(
+            'text',
             'panelId',
             array(
                 'placeholder'   => 'example 1 or 1,4,10 ...',
@@ -202,6 +213,7 @@ class GraphForm extends ConfigForm
         $name = $this->getElement('name')->getValue();
         $values = array(
             'dashboard'   => $this->getElement('dashboard')->getValue(),
+            'hostDashboard'   => $this->getElement('hostDashboard')->getValue(),
             'panelId'     => $this->getElement('panelId')->getValue(),
             'customVars'  => $this->getElement('customVars')->getValue(),
             'timerange'   => $this->getElement('timerange')->getValue(),
