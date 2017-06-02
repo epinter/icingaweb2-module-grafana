@@ -128,11 +128,11 @@ class Grapher extends GrapherHook
         }
     }
 
-    private function getGraphConf($serviceName, $serviceCommand)
+    private function getGraphConf($serviceName, $serviceCommand, $hostgroups, $hostName)
     {
-
         $graphconfig = Config::module('grafana', 'graphs');
         $this->graphConfig = $graphconfig;
+
         if ($this->graphConfig->hasSection(strtok($serviceName, ' ')) && ($this->graphConfig->hasSection($serviceName) == False)) {
             $serviceName = strtok($serviceName, ' ');
         }
@@ -142,6 +142,7 @@ class Grapher extends GrapherHook
                 return NULL;
             }
         }
+
         $this->dashboard = $this->graphConfig->get($serviceName, 'dashboard', $this->defaultDashboard);
         $this->dashboardstore = $this->graphConfig->get($serviceName, 'dashboardstore', $this->defaultDashboardStore);
         $this->panelId = $this->graphConfig->get($serviceName, 'panelId', '1');
@@ -150,7 +151,43 @@ class Grapher extends GrapherHook
         $this->height = $this->graphConfig->get($serviceName, 'height', $this->height);
         $this->width = $this->graphConfig->get($serviceName, 'width', $this->width);
 
+        foreach($hostgroups as $key => $value) {
+            $this->dashboard=$this->getOverrideProperty($serviceName,'dashboard',$key,$this->dashboard);
+            $this->dashboardstore=$this->getOverrideProperty($serviceName,'dashboardstore',$key,$this->dashboardstore);
+            $this->panelId=$this->getOverrideProperty($serviceName,'panelId',$key,$this->panelId);
+            $this->customVars=$this->getOverrideProperty($serviceName,'customVars',$key,$this->customVars);
+            $this->timerange=$this->getOverrideProperty($serviceName,'timerange',$key,$this->timerange);
+            $this->height=$this->getOverrideProperty($serviceName,'height',$key,$this->height);
+            $this->width=$this->getOverrideProperty($serviceName,'width',$key,$this->width);
+        }
+        $this->dashboard=$this->getOverrideProperty($serviceName,'dashboard',$hostName,$this->dashboard);
+        $this->dashboardstore=$this->getOverrideProperty($serviceName,'dashboardstore',$hostName,$this->dashboardstore);
+        $this->panelId=$this->getOverrideProperty($serviceName,'panelId',$hostName,$this->panelId);
+        $this->customVars=$this->getOverrideProperty($serviceName,'customVars',$hostName,$this->customVars);
+        $this->timerange=$this->getOverrideProperty($serviceName,'timerange',$hostName,$this->timerange);
+        $this->height=$this->getOverrideProperty($serviceName,'height',$hostName,$this->height);
+        $this->width=$this->getOverrideProperty($serviceName,'width',$hostName,$this->width);
+
+        if(!$this->dashboard || !$this->panelId) {
+            return NULL;
+        }
+
         return $this;
+    }
+
+    private function getOverrideProperty($serviceName,$property,$key,$default = null) {
+        $ret=null;
+        $overrides = $this->graphConfig->get($serviceName,$property.'Overrides');
+        foreach(explode(PHP_EOL, $overrides) as $line) {
+            preg_match("/\s*[\"']\s*([^\"']+)\s*['\"]\s*=\s*['\"]\s*([^'\"]+)\s*[\"']/", $line, $matches);
+            if($matches) {
+                #error_log($line.'======='.print_r($matches[1],1).'='.print_r($matches[2],1));
+                if($key === $matches[1]) {
+                    return $matches[2];
+                }
+            }
+        }
+        return $default;
     }
 
     private function getTimerangeLink($object, $rangeName, $timeRange)
@@ -316,7 +353,7 @@ class Grapher extends GrapherHook
             $hostName = $object->host->getName();
         }
 
-        if($this->getGraphConf($serviceName, $object->check_command) == NULL) {
+        if($this->getGraphConf($serviceName, $object->check_command, $object->hostgroups, $hostName) == NULL) {
             return;
         }
 

@@ -50,7 +50,7 @@ class GraphForm extends ConfigForm
                 'placeholder'   => 'DashboardName',
                 'label'         => $this->translate('Dashboard name'),
                 'description'   => $this->translate('Name of the Grafana dashboard that will be used.'),
-                'required'      => true
+                'required'      => false
             )
         );
 
@@ -61,7 +61,7 @@ class GraphForm extends ConfigForm
                 'placeholder'   => 'example 1 or 1,4,10 ...',
                 'label'         => $this->translate('PanelId(s)'),
                 'description'   => $this->translate('Single panelId or comma seperated list of panelIds that will be used to show the graph(s).'),
-                'required'      => true
+                'required'      => false
             )
         );
 
@@ -123,6 +123,49 @@ class GraphForm extends ConfigForm
             )
         );
 
+        $this->addElement(
+            'textarea',
+            'dashboardOverrides',
+            array(
+                'placeholder'   => "'hostgroup-internalname'='1'\n'hostname'='2'",
+                'label'         => $this->translate('Dashboard Overrides'),
+                'description'   => $this->translate("Override rules, one by line, single-quotes are important. Example: 'hostgroup-internalname'='linuxdashboard'"),
+                'required'      => false
+            )
+        );
+
+        $this->addElement(
+            'textarea',
+            'panelIdOverrides',
+            array(
+                'placeholder'   => "'hostgroup-internalname'='1'\n'hostname'='2'",
+                'label'         => $this->translate('PanelId Overrides'),
+                'description'   => $this->translate("Override rules, one by line, single-quotes are important. Example: 'hostgroup-internalname'='3'"),
+                'required'      => false
+            )
+        );
+
+        $this->addElement(
+            'textarea',
+            'widthOverrides',
+            array(
+                'placeholder'   => "'hostgroup-internalname'='1'\n'hostname'='2'",
+                'label'         => $this->translate('Graph Width Overrides'),
+                'description'   => $this->translate("Override rules, one by line, single-quotes are important. Example: 'hostgroup-internalname'='700'"),
+                'required'      => false
+            )
+        );
+
+        $this->addElement(
+            'textarea',
+            'heightOverrides',
+            array(
+                'placeholder'   => "'hostgroup-internalname'='1'\n'hostname'='2'",
+                'label'         => $this->translate('Graph Height Overrides'),
+                'description'   => $this->translate("Override rules, one by line, single-quotes are important. Example: 'hostgroup-internalname'='200'"),
+                'required'      => false
+            )
+        );
 
     }
 
@@ -163,7 +206,11 @@ class GraphForm extends ConfigForm
             'customVars'  => $this->getElement('customVars')->getValue(),
             'timerange'   => $this->getElement('timerange')->getValue(),
             'height'      => $this->getElement('height')->getValue(),
-            'width'       => $this->getElement('width')->getValue()
+            'width'       => $this->getElement('width')->getValue(),
+            'panelIdOverrides'     => $this->getElement('panelIdOverrides')->getValue(),
+            'dashboardOverrides'     => $this->getElement('dashboardOverrides')->getValue(),
+            'widthOverrides'     => $this->getElement('widthOverrides')->getValue(),
+            'heightOverrides'     => $this->getElement('heightOverrides')->getValue(),
         );
 	if (empty($values['timerange'])) {
             $values['timerange'] = null;
