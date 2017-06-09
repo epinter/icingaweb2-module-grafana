@@ -78,6 +78,17 @@ class GraphForm extends ConfigForm
 
         $this->addElement(
             'text',
+            'orgId',
+            array(
+                'placeholder'   => 'example 1 ...',
+                'label'         => $this->translate('OrganizationId'),
+                'description'   => $this->translate('Organization id where the dashboard is located.'),
+                'required'      => false
+            )
+        );
+
+        $this->addElement(
+            'text',
             'customVars',
             array(
                 'placeholder'   => '&var-example=$my_variable$',
@@ -226,6 +237,7 @@ class GraphForm extends ConfigForm
             'dashboard'   => $this->getElement('dashboard')->getValue(),
             'hostDashboard'   => $this->getElement('hostDashboard')->getValue(),
             'panelId'     => $this->getElement('panelId')->getValue(),
+            'orgId'     => $this->getElement('orgId')->getValue(),
             'customVars'  => $this->getElement('customVars')->getValue(),
             'timerange'   => $this->getElement('timerange')->getValue(),
             'height'      => $this->getElement('height')->getValue(),
