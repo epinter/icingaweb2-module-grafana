@@ -19,8 +19,10 @@ class Grapher extends GrapherHook
     protected $config;
     protected $graphConfig;
     protected $auth;
+    protected $cryptAlgo='aes-256-cbc';
     protected $grafana = array();
     protected $grafanaHost = null;
+    protected $grafanaTheme = 'light';
     protected $protocol = "http";
     protected $usePublic = "no";
     protected $publicHost = null;
@@ -32,6 +34,8 @@ class Grapher extends GrapherHook
     protected $height = 280;
     protected $enableLink = true;
     protected $defaultDashboard = "icinga2-default";
+    protected $hostDashboard = null;
+    protected $shadows = false;
     protected $defaultDashboardStore = "db";
     protected $dataSource = null;
     protected $accessMode = "proxy";
@@ -61,7 +65,7 @@ class Grapher extends GrapherHook
             '30d' => '30 days',
         ),
         'Months' => array (
-            '2M' => '2 Month',
+            '2M' => '2 month',
             '6M' => '6 months',
             '9M' => '9 months'
         ),
@@ -77,6 +81,7 @@ class Grapher extends GrapherHook
         $this->config = Config::module('grafana')->getSection('grafana');
         $this->username = $this->config->get('username', $this->username);
         $this->grafanaHost = $this->config->get('host', $this->grafanaHost);
+        $this->grafanaTheme = $this->config->get('theme', $this->grafanaTheme);
         if ($this->grafanaHost == null) {
             throw new ConfigurationError(
                 'No Grafana host configured!'
@@ -107,6 +112,7 @@ class Grapher extends GrapherHook
             }
         }
         $this->defaultDashboard = $this->config->get('defaultdashboard', $this->defaultDashboard);
+        $this->shadows = $this->config->get('shadows', $this->shadows);
         $this->defaultDashboardStore = $this->config->get('defaultdashboardstore', $this->defaultDashboardStore);
         $this->dataSource = $this->config->get('datasource', $this->dataSource);
         $this->accessMode = $this->config->get('accessmode', $this->accessMode);
@@ -122,13 +128,21 @@ class Grapher extends GrapherHook
         } else {
             $this->auth = "";
         }
+        if ( Url::fromRequest()->hasParam('grafanaimage') ) {
+            $imageUrl = Url::fromRequest()->getParam('grafanaimage');
+            list($imageContent, $imageType, $imageSize) = $this->getGrafanaImage(rawurldecode($imageUrl));
+            header('Content-Type: '.$imageType);
+            header('Content-Length: '.$imageSize);
+            echo $imageContent;
+            exit;
+        }
     }
 
-    private function getGraphConf($serviceName, $serviceCommand)
+    private function getGraphConf($serviceName, $serviceCommand, $hostgroups, $hostName)
     {
-
         $graphconfig = Config::module('grafana', 'graphs');
         $this->graphConfig = $graphconfig;
+
         if ($this->graphConfig->hasSection(strtok($serviceName, ' ')) && ($this->graphConfig->hasSection($serviceName) == False)) {
             $serviceName = strtok($serviceName, ' ');
         }
@@ -138,15 +152,55 @@ class Grapher extends GrapherHook
                 return NULL;
             }
         }
+
         $this->dashboard = $this->graphConfig->get($serviceName, 'dashboard', $this->defaultDashboard);
         $this->dashboardstore = $this->graphConfig->get($serviceName, 'dashboardstore', $this->defaultDashboardStore);
         $this->panelId = $this->graphConfig->get($serviceName, 'panelId', '1');
+        $this->hostDashboard = $this->graphConfig->get($serviceName, 'hostDashboard');
         $this->customVars = $this->graphConfig->get($serviceName, 'customVars', '');
         $this->timerange = Url::fromRequest()->hasParam('timerange') ? Url::fromRequest()->getParam('timerange') : $this->graphConfig->get($serviceName, 'timerange', $this->timerange);
         $this->height = $this->graphConfig->get($serviceName, 'height', $this->height);
         $this->width = $this->graphConfig->get($serviceName, 'width', $this->width);
 
+        foreach($hostgroups as $key => $value) {
+            $this->dashboard=$this->getOverrideProperty($serviceName,'dashboard',$key,$this->dashboard);
+            $this->dashboardstore=$this->getOverrideProperty($serviceName,'dashboardstore',$key,$this->dashboardstore);
+            $this->panelId=$this->getOverrideProperty($serviceName,'panelId',$key,$this->panelId);
+            $this->hostDashboard=$this->getOverrideProperty($serviceName,'hostDashboard',$key,$this->hostDashboard);
+            $this->customVars=$this->getOverrideProperty($serviceName,'customVars',$key,$this->customVars);
+            $this->timerange=$this->getOverrideProperty($serviceName,'timerange',$key,$this->timerange);
+            $this->height=$this->getOverrideProperty($serviceName,'height',$key,$this->height);
+            $this->width=$this->getOverrideProperty($serviceName,'width',$key,$this->width);
+        }
+        $this->dashboard=$this->getOverrideProperty($serviceName,'dashboard',$hostName,$this->dashboard);
+        $this->dashboardstore=$this->getOverrideProperty($serviceName,'dashboardstore',$hostName,$this->dashboardstore);
+        $this->panelId=$this->getOverrideProperty($serviceName,'panelId',$hostName,$this->panelId);
+        $this->hostDashboard=$this->getOverrideProperty($serviceName,'hostDashboard',$hostName,$this->hostDashboard);
+        $this->customVars=$this->getOverrideProperty($serviceName,'customVars',$hostName,$this->customVars);
+        $this->timerange=$this->getOverrideProperty($serviceName,'timerange',$hostName,$this->timerange);
+        $this->height=$this->getOverrideProperty($serviceName,'height',$hostName,$this->height);
+        $this->width=$this->getOverrideProperty($serviceName,'width',$hostName,$this->width);
+
+        if(!$this->dashboard || !$this->panelId) {
+            return NULL;
+        }
+
         return $this;
+    }
+
+    private function getOverrideProperty($serviceName,$property,$key,$default = null) {
+        $ret=null;
+        $overrides = $this->graphConfig->get($serviceName,$property.'Overrides');
+        foreach(explode(PHP_EOL, $overrides) as $line) {
+            preg_match("/\s*[\"']\s*([^\"']+)\s*['\"]\s*=\s*['\"]\s*([^'\"]+)\s*[\"']/", $line, $matches);
+            if($matches) {
+                #error_log($line.'======='.print_r($matches[1],1).'='.print_r($matches[2],1));
+                if($key === $matches[1]) {
+                    return $matches[2];
+                }
+            }
+        }
+        return $default;
     }
 
     private function getTimerangeLink($object, $rangeName, $timeRange)
@@ -179,14 +233,90 @@ class Grapher extends GrapherHook
         );
     }
 
+    private function getGrafanaImage($q) {
+        $url=sprintf("%s://%s/render/dashboard-solo/%s",
+            $this->protocol,
+            $this->grafanaHost,
+            $this->decryptString($q)
+        );
+        $curl_handle = curl_init();
+        $curl_opts = array(
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => 0,
+            CURLOPT_TIMEOUT => $this->timeout,
+            CURLOPT_USERPWD => "$this->auth",
+            CURLOPT_HTTPAUTH, CURLAUTH_ANY
+        );
+        curl_setopt_array($curl_handle, $curl_opts);
+        $res = curl_exec($curl_handle);
+        $info = curl_getinfo($curl_handle);
+        $imagetype=$info['content_type'];
+        $imagesize=$info['download_content_length'];
+
+        if ($res === false || $info['http_code'] > 299) {
+            $logmessage = array("Cannot fetch graph from server.");
+            if ($res === false) {
+                if(curl_errno($curl_handle) == 7) {
+                    $logmessage[] = 'Failed to connect to host/port, Server unavailable.';
+                } else {
+                    $logmessage[] = curl_error($curl_handle);
+                }
+                error_log(sprintf("%s: %s",$logmessage[0],curl_error($curl_handle)));
+            }
+            if ($info['http_code'] > 299) {
+                $logmessage[] = sprintf("Error: %s %s", $info['http_code'], Util::httpStatusCodeToString($info['http_code']));
+                try {
+                    $error = @json_decode($res);
+                    $logmessage[] = (property_exists($error, 'message') ? $error->message : "");
+                } catch(Exception $e) {
+                    error_log("An exception occured while generating error message: ".$e->getMessage());
+                }
+                error_log(sprintf("'%s' %s (%s)",$logmessage[0],$logmessage[1],count($logmessage) >2?$logmessage[2]:''));
+            }
+            try {
+                if (function_exists('gd_info')) {
+                    $imagefont=3;
+                    $marginx=20;
+                    $imagefontwidth=imagefontwidth($imagefont);
+                    $imagefontheight=imagefontheight($imagefont)+3;
+                    $maxerrstr=max(array_map('strlen', $logmessage))*$imagefontwidth;
+                    $im = imagecreatetruecolor($maxerrstr + (2*($imagefontwidth))+$marginx, ($imagefontheight)*(count($logmessage)+2));
+                    $text_color = imagecolorallocate($im, 0, 0, 0);
+                    imagefill($im, 0, 0, imagecolorallocate($im, 255, 255, 255));
+
+                    ob_start();
+                    for($i=0;$i<count($logmessage);$i++) {
+                        imagestring($im, $imagefont, $marginx, $imagefontheight+($imagefontheight*$i),  $logmessage[$i], $text_color);
+                    }
+                    imagepng($im,NULL,8);
+                    $res = ob_get_contents();
+                    ob_end_clean();
+
+                    imagedestroy($im);
+                    $imagetype='image/png';
+                    $imagesize=strlen($res);
+                } else {
+                    error_log('WARNING: PHP-GD EXTENSION NOT AVAILABLE! (error messages wont be sent to browser)');
+                }
+            } catch(Exception $e) {
+                error_log("An exception occured while generating error message: ".$e->getMessage());
+            }
+
+        }
+        curl_close($curl_handle);
+
+        return array($res, $imagetype, $imagesize);
+    }
+
     //returns false on error, previewHTML is passed as reference
-    private function getMyPreviewHtml($serviceName, $hostName, &$previewHtml)
+    private function getMyPreviewHtml($serviceName, $hostName, &$previewHtml, $object)
     {
+        $imgClass = $this->shadows ? "grafana-img grafana-img-shadows" : "grafana-img";
         if ($this->accessMode == "proxy") {
             $pngUrl = sprintf(
-                '%s://%s/render/dashboard-solo/%s/%s?var-hostname=%s&var-service=%s%s&panelId=%s&width=%s&height=%s&theme=light&from=now-%s&to=now',
-                $this->protocol,
-                $this->grafanaHost,
+                '%s/%s?var-hostname=%s&var-service=%s%s&panelId=%s&width=%s&height=%s&theme=%s&from=now-%s&to=now',
                 $this->dashboardstore,
                 $this->dashboard,
                 urlencode($hostName),
@@ -195,57 +325,29 @@ class Grapher extends GrapherHook
                 $this->panelId,
                 $this->width,
                 $this->height,
+                $this->grafanaTheme,
                 $this->timerange
             );
 
-            // fetch image with curl
-            $curl_handle = curl_init();
-            $curl_opts = array(
-                CURLOPT_URL => $pngUrl,
-                CURLOPT_CONNECTTIMEOUT => 2,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_SSL_VERIFYPEER => false, //TODO: config option
-                CURLOPT_SSL_VERIFYHOST => 0, //TODO: config option
-                CURLOPT_TIMEOUT => $this->timeout,
-                CURLOPT_USERPWD => "$this->auth",
-                CURLOPT_HTTPAUTH, CURLAUTH_ANY
-            );
-
-            curl_setopt_array($curl_handle, $curl_opts);
-            $res = curl_exec($curl_handle);
-
-            if ($res === false) {
-                $previewHtml = "<b>Cannot fetch graph with curl:</b> '" . curl_error($curl_handle) . "'.";
-
-                //provide a hint for 'Failed to connect to ...: Permission denied'
-                if (curl_errno($curl_handle) == 7) {
-                    $previewHtml .= " Check SELinux/Firewall.";
-                }
-                return false;
+            $this->view = Icinga::app()->getViewRenderer()->view;
+            if ($object instanceof Host)
+            {
+                $array = array(
+                      'host'       => $object->host_name,
+                      'grafanaimage' => rawurlencode($this->encryptString($pngUrl)),
+                );
+                $link = 'monitoring/host/show';
+            } else {
+                $array = array(
+                      'host'       => $object->host->getName(),
+                      'service'    => $object->service_description,
+                      'grafanaimage' => rawurlencode($this->encryptString($pngUrl)),
+                );
+                $link = 'monitoring/service/show';
             }
-
-            $statusCode = curl_getinfo($curl_handle, CURLINFO_HTTP_CODE);
-
-            if ($statusCode > 299) {
-                $error = @json_decode($res);
-                $previewHtml = "<b>Cannot fetch Grafana graph: " . Util::httpStatusCodeToString($statusCode) .
-                    " ($statusCode)</b>: " . (property_exists($error, 'message') ? $error->message : "");
-                return false;
-            }
-
-            curl_close($curl_handle);
-
-            $img = 'data:image/png;base64,' . base64_encode($res);
-            $imghtml = '<img src="%s" alt="%s" width="%d" height="%d" class="grafana-img"/>';
-            $previewHtml = sprintf(
-                $imghtml,
-                $img,
-                rawurlencode($serviceName),
-                $this->width,
-                $this->height
-            );
+            $previewHtml = sprintf('<img src="%s" class="'. $imgClass .'">', $this->view->url($link, $array));
         } elseif ($this->accessMode == "direct") {
-            $imghtml = '<img src="%s://%s/render/dashboard-solo/%s/%s?var-hostname=%s&var-service=%s%s&panelId=%s&width=%s&height=%s&theme=light&from=now-%s&to=now&trickrefresh=%s" alt="%s" width="%d" height="%d" />';
+            $imghtml = '<img src="%s://%s/render/dashboard-solo/%s/%s?var-hostname=%s&var-service=%s%s&panelId=%s&width=%s&height=%s&theme=%s&from=now-%s&to=now&trickrefresh=%s" alt="%s" width="%d" height="%d" class="'. $imgClass .'"/>';
             $previewHtml = sprintf(
                 $imghtml,
                 $this->protocol,
@@ -258,6 +360,7 @@ class Grapher extends GrapherHook
                 $this->panelId,
                 $this->width,
                 $this->height,
+                $this->grafanaTheme,
                 $this->timerange,
                 $this->refresh,
                 rawurlencode($serviceName),
@@ -265,7 +368,7 @@ class Grapher extends GrapherHook
                 $this->height
             );
         } elseif ($this->accessMode == "iframe") {
-            $iframehtml = '<iframe src="%s://%s/dashboard-solo/%s/%s?var-hostname=%s&var-service=%s%s&panelId=%s&theme=light&from=now-%s&to=now" alt="%s" height="%d" frameBorder="0" style="width: 100%%;"></iframe>';
+            $iframehtml = '<iframe src="%s://%s/dashboard-solo/%s/%s?var-hostname=%s&var-service=%s%s&panelId=%s&theme=%s&from=now-%s&to=now" alt="%s" height="%d" frameBorder="0" style="width: 100%%;"></iframe>';
             $previewHtml = sprintf(
                 $iframehtml,
                 $this->protocol,
@@ -276,6 +379,7 @@ class Grapher extends GrapherHook
                 rawurlencode($serviceName),
                 $this->customVars,
                 $this->panelId,
+                $this->grafanaTheme,
                 $this->timerange,
                 rawurlencode($serviceName),
                 $this->height
@@ -295,8 +399,8 @@ class Grapher extends GrapherHook
 
     public function getPreviewHtml(MonitoredObject $object)
     {
-        // enable_perfdata = true ?  || no perfdata into service || disablevar == true
-        if (!$object->process_perfdata || !$object->perfdata || isset($object->customvars[$this->custvardisable])) {
+        // enable_perfdata = true ?  || disablevar == true
+        if (!$object->process_perfdata || isset($object->customvars[$this->custvardisable])) {
             return '';
         }
 
@@ -308,7 +412,7 @@ class Grapher extends GrapherHook
             $hostName = $object->host->getName();
         }
 
-        if($this->getGraphConf($serviceName, $object->check_command) == NULL) {
+        if($this->getGraphConf($serviceName, $object->check_command, $object->hostgroups, $hostName) == NULL) {
             return;
         }
 
@@ -327,6 +431,7 @@ class Grapher extends GrapherHook
 
         $return_html = "";
         $menu = '<table class="grafana-table"><tr>';
+        $menu .= '<td><div class="grafana-icon"><div class="grafana-clock"></div></div></td>';
         foreach ($this->timeRanges as $key => $mainValue) {
             $menu .= '<td><ul class="grafana-menu-navigation"><a class="main" href="#">' . $key . '</a>';
             $counter = 1;
@@ -345,15 +450,18 @@ class Grapher extends GrapherHook
 
             //image value will be returned as reference
             $previewHtml = "";
-            $res = $this->getMyPreviewHtml($serviceName, $hostName, $previewHtml);
+            $res = $this->getMyPreviewHtml($serviceName, $hostName, $previewHtml, $object);
 
             //do not render URLs on error or if disabled
-            if (!$res || $this->enableLink == "no") {
+            if ($this->enableLink == "no") {
                 $html .= $previewHtml;
             } else {
-                $html .= '<a href="%s://%s/dashboard/%s/%s?var-hostname=%s&var-service=%s%s&from=now-%s&to=now';
+                $html .= '<a href="%s://%s/dashboard/%s/%s?var-hostname=%s%s&from=now-%s&to=now%s';
 
-                if ($this->dashboard != $this->defaultDashboard) {
+                if(!$object instanceof Host && $this->hostDashboard) {
+                    $this->hostDashboard = null;
+                }
+                if ($this->dashboard != $this->defaultDashboard && !$this->hostDashboard) {
                     $html .= '&panelId=' . $this->panelId . '&fullscreen';
                 }
 
@@ -364,16 +472,56 @@ class Grapher extends GrapherHook
                     $this->publicProtocol,
                     $this->publicHost,
                     $this->dashboardstore,
-                    $this->dashboard,
+                    $this->hostDashboard?$this->hostDashboard:$this->dashboard,
                     urlencode($hostName),
-                    rawurlencode($serviceName),
                     $this->customVars,
                     $this->timerange,
+                    !$this->hostDashboard?sprintf("&var-service=%s",rawurlencode($serviceName)):'',
                     $previewHtml
                 );
+
             }
             $return_html .= $html;
         }
         return '<div class="icinga-module module-grafana">'.$this->title.$menu.$return_html.'</div>';
+    }
+
+    private function genKey() {
+        if(openssl_cipher_iv_length($this->cryptAlgo)==16) {
+            $hash = hash('md5',$this->grafanaHost.$this->username.$this->password.$this->protocol.$this->dataSource);
+        } else {
+            $hash = hash('sha256',$this->grafanaHost.$this->username.$this->password.$this->protocol.$this->dataSource);
+        }
+        return pack("H*",$hash);
+    }
+
+    private function encryptString($string) {
+        if (function_exists('openssl_encrypt')) {
+            $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length($this->cryptAlgo));
+            try {
+                $encrypted = openssl_encrypt($string,$this->cryptAlgo,$this->genKey(),NULL,$iv);
+            } catch(Exception $e) {
+                error_log("openssl_encrypt failed: ".$e->getMessage());
+            }
+            return base64_encode(base64_encode($iv).':'.$encrypted);
+        } else {
+            error_log('WARNING: PHP-OPENSSL EXTENSION NOT AVAILABLE! (missing openssl_encrypt)');
+            return base64_encode($string);
+        }
+    }
+
+    private function decryptString($string) {
+        if (function_exists('openssl_encrypt')) {
+            $data = explode(':',base64_decode($string));
+            $iv = base64_decode($data[0]);
+            try {
+                $decrypted = openssl_decrypt($data[1],$this->cryptAlgo,$this->genKey(),NULL,$iv);
+            } catch(Exception $e) {
+                error_log("openssl_decrypt failed: ".$e->getMessage());
+            }
+            return rtrim($decrypted,"\0");
+        } else {
+            return base64_decode($string);
+        }
     }
 }

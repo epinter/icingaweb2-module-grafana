@@ -88,6 +88,15 @@ class GeneralConfigForm extends ConfigForm
             )
         );
         $this->addElement(
+            'checkbox',
+            'grafana_shadows',
+            array(
+                'value'=> false,
+                'label' => $this->translate('Show shadows'),
+                'description' => $this->translate('Show shadows around the graph.'),
+            )
+        );
+        $this->addElement(
             'select',
             'grafana_defaultdashboardstore',
             array(
@@ -97,6 +106,19 @@ class GeneralConfigForm extends ConfigForm
                     'file' => $this->translate('File'),
                 ),
                 'description' => $this->translate('Grafana Backend Type.')
+            )
+        );
+        $this->addElement(
+            'select',
+            'grafana_theme',
+            array(
+                'label' => $this->translate('Grafana theme'),
+                'value' => 'light',
+                'multiOptions' => array(
+                    'light' => $this->translate('Light'),
+                    'dark' => $this->translate('Dark'),
+                ),
+                'description' => $this->translate('Grafana theme that will be used.')
             )
         );
         $this->addElement(
@@ -168,7 +190,8 @@ class GeneralConfigForm extends ConfigForm
                     array(
                         'renderPassword' => true,
                         'label' => $this->translate('Password'),
-                        'description' => $this->translate('The HTTP Basic Auth password used to access Grafana.'),
+                        'description' => $this->translate('HTTP Basic Auth password to access Grafana, and key for encryption. The password field data is also used during data encryption even when the http auth is disabled, so type a password even if you use anonymous auth.'),
+
                         'required' => true
                     )
                 );
