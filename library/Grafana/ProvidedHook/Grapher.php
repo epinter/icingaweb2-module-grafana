@@ -160,6 +160,7 @@ class Grapher extends GrapherHook
             $this->dashboard=$this->getOverrideProperty($serviceName,'dashboard',$key,$this->dashboard);
             $this->dashboardstore=$this->getOverrideProperty($serviceName,'dashboardstore',$key,$this->dashboardstore);
             $this->panelId=$this->getOverrideProperty($serviceName,'panelId',$key,$this->panelId);
+            $this->orgId=$this->getOverrideProperty($serviceName,'orgId',$key,$this->orgId);
             $this->hostDashboard=$this->getOverrideProperty($serviceName,'hostDashboard',$key,$this->hostDashboard);
             $this->customVars=$this->getOverrideProperty($serviceName,'customVars',$key,$this->customVars);
             $this->timerange=$this->getOverrideProperty($serviceName,'timerange',$key,$this->timerange);
@@ -169,6 +170,7 @@ class Grapher extends GrapherHook
         $this->dashboard=$this->getOverrideProperty($serviceName,'dashboard',$hostName,$this->dashboard);
         $this->dashboardstore=$this->getOverrideProperty($serviceName,'dashboardstore',$hostName,$this->dashboardstore);
         $this->panelId=$this->getOverrideProperty($serviceName,'panelId',$hostName,$this->panelId);
+        $this->orgId=$this->getOverrideProperty($serviceName,'orgId',$hostName,$this->orgId);
         $this->hostDashboard=$this->getOverrideProperty($serviceName,'hostDashboard',$hostName,$this->hostDashboard);
         $this->customVars=$this->getOverrideProperty($serviceName,'customVars',$hostName,$this->customVars);
         $this->timerange=$this->getOverrideProperty($serviceName,'timerange',$hostName,$this->timerange);
