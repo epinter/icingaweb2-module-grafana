@@ -142,8 +142,7 @@ class Grapher extends GrapherHook
 
     private function getGraphConf($serviceName, $serviceCommand, $hostgroups, $hostName)
     {
-        $graphconfig = Config::module('grafana', 'graphs');
-        $this->graphConfig = $graphconfig;
+        $this->graphConfig = Config::module('grafana', 'graphs');
 
         if ($this->graphConfig->hasSection(strtok($serviceName, ' ')) && ($this->graphConfig->hasSection($serviceName) == False)) {
             $serviceName = strtok($serviceName, ' ');
@@ -155,15 +154,15 @@ class Grapher extends GrapherHook
             }
         }
 
-        $this->dashboard = $this->graphConfig->get($serviceName, 'dashboard', $this->defaultDashboard);
-        $this->dashboardstore = $this->graphConfig->get($serviceName, 'dashboardstore', $this->defaultDashboardStore);
-        $this->panelId = $this->graphConfig->get($serviceName, 'panelId', '1');
-        $this->hostDashboard = $this->graphConfig->get($serviceName, 'hostDashboard');
-        $this->orgId = $this->graphConfig->get($serviceName, 'orgId', $this->defaultOrgId);
-        $this->customVars = $this->graphConfig->get($serviceName, 'customVars', '');
-        $this->timerange = Url::fromRequest()->hasParam('timerange') ? Url::fromRequest()->getParam('timerange') : $this->graphConfig->get($serviceName, 'timerange', $this->timerange);
-        $this->height = $this->graphConfig->get($serviceName, 'height', $this->height);
-        $this->width = $this->graphConfig->get($serviceName, 'width', $this->width);
+        $this->dashboard = $this->getGraphConfigOption($serviceName, 'dashboard', $this->defaultDashboard);
+        $this->dashboardstore = $this->getGraphConfigOption($serviceName, 'dashboardstore', $this->defaultDashboardStore);
+        $this->panelId = $this->getGraphConfigOption($serviceName, 'panelId', '1');
+        $this->hostDashboard = $this->getGraphConfigOption($serviceName, 'hostDashboard');
+        $this->orgId = $this->getGraphConfigOption($serviceName, 'orgId', $this->defaultOrgId);
+        $this->customVars = $this->getGraphConfigOption($serviceName, 'customVars', '');
+        $this->timerange = Url::fromRequest()->hasParam('timerange') ? Url::fromRequest()->getParam('timerange') : $this->getGraphConfigOption($serviceName, 'timerange', $this->timerange);
+        $this->height = $this->getGraphConfigOption($serviceName, 'height', $this->height);
+        $this->width = $this->getGraphConfigOption($serviceName, 'width', $this->width);
 
         foreach($hostgroups as $key => $value) {
             $this->dashboard=$this->getOverrideProperty($serviceName,'dashboard',$key,$this->dashboard);
@@ -191,6 +190,14 @@ class Grapher extends GrapherHook
         }
 
         return $this;
+    }
+
+    private function getGraphConfigOption($section, $option, $default=NULL) {
+        $value = $this->graphConfig->get($section, $option, $default);
+        if(empty($value)) {
+            return $default;
+        }
+        return $value;
     }
 
     private function getOverrideProperty($serviceName,$property,$key,$default = null) {
